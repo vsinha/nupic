@@ -283,7 +283,6 @@ class SpatialPooler(object):
     for i in xrange(numColumns):
       tieBreaker[i] = 0.01 * self._random.getReal64()
 
-
     # 'self._connectedSynapses' is a similar matrix to 'self._permanences'
     # (rows represent cortial columns, columns represent input bits) whose
     # entries represent whether the cortial column is connected to the input
@@ -310,7 +309,6 @@ class SpatialPooler(object):
       perm = self._initPermanence(potential, initConnectedPct)
       self._updatePermanencesForColumn(perm, i, raisePerm=True)
 
-
     overlapDutyCycles = self._proto.init("overlapDutyCycles", numColumns)
     activeDutyCycles = self._proto.init("activeDutyCycles", numColumns)
     minOverlapDutyCycles = self._proto.init("minOverlapDutyCycles", numColumns)
@@ -334,6 +332,13 @@ class SpatialPooler(object):
     if self._proto.spVerbosity > 0:
       self.printParameters()
 
+  def save(self, filename):
+    with open(filename, "w+b") as f:
+      self._proto.write(f)
+
+  def load(self, filename):
+    with open(filename, "rb") as f:
+      self._proto = spatial_pooler_capnp.SpatialPooler.read(f)
 
   def getColumnDimensions(self):
     """Returns the dimensions of the columns in the region"""
