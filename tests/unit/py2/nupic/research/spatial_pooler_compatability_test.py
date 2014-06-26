@@ -29,6 +29,7 @@ import traceback
 from nupic.support.unittesthelpers.algorithm_test_helpers \
      import getNumpyRandomGenerator, CreateSP, convertPermanences
 from nupic.research.spatial_pooler import SpatialPooler as PySpatialPooler
+from nupic.proto.spatial_pooler import SpatialPooler as CapnpSpatialPooler
 from nupic.bindings.algorithms import SpatialPooler as CPPSpatialPooler
 from nupic.bindings.math import GetNTAReal, Random as NupicRandom
 
@@ -47,7 +48,7 @@ class SpatialPoolerCompatabilityTest(unittest.TestCase):
   def setUp(self):
     # Set to 1 for more verbose debugging output
     self.verbosity = 1
-    
+
   def assertListAlmostEqual(self, alist, blist):
     self.assertEqual(len(alist), len(blist))
     for a, b in zip(alist, blist):
@@ -168,10 +169,10 @@ class SpatialPoolerCompatabilityTest(unittest.TestCase):
     Run the PY and CPP implementations side by side on random inputs.
     If seed is None a random seed will be chosen based on time, otherwise
     the fixed seed will be used.
-    
+
     If learnMode is None learning will be randomly turned on and off.
     If it is False or True then set it accordingly.
-    
+
     If convertEveryIteration is True, the CPP will be copied from the PY
     instance on every iteration just before each compute.
     """
@@ -184,7 +185,7 @@ class SpatialPoolerCompatabilityTest(unittest.TestCase):
     threshold = 0.8
     inputMatrix = (
       randomState.rand(numRecords,numInputs) > threshold).astype(uintType)
-    
+
     # Run side by side for numRecords iterations
     for i in xrange(numRecords):
       if learnMode is None:
@@ -196,7 +197,7 @@ class SpatialPoolerCompatabilityTest(unittest.TestCase):
       PyActiveArray = numpy.zeros(numColumns).astype(uintType)
       CppActiveArray = numpy.zeros(numColumns).astype(uintType)
       inputVector = inputMatrix[i,:]
-      
+
       pySp.compute(inputVector, learn, PyActiveArray)
       cppSp.compute(inputVector, learn, CppActiveArray)
       self.assertListEqual(list(PyActiveArray), list(CppActiveArray))
@@ -214,7 +215,7 @@ class SpatialPoolerCompatabilityTest(unittest.TestCase):
   def runSerialize(self, imp, params, seed = None):
     randomState = getNumpyRandomGenerator(seed)
     sp1 = CreateSP(imp, params)
-    numColumns = sp1.getNumColumns() 
+    numColumns = sp1.getNumColumns()
     numInputs = sp1.getNumInputs()
     threshold = 0.8
     inputMatrix = (
@@ -222,9 +223,38 @@ class SpatialPoolerCompatabilityTest(unittest.TestCase):
 
     for i in xrange(numRecords/2):
       activeArray = numpy.zeros(numColumns).astype(uintType)
-      inputVector = inputMatrix[i,:] 
-      learn = (randomState.rand() > 0.5) 
+      inputVector = inputMatrix[i,:]
+      learn = (randomState.rand() > 0.5)
       sp1.compute(inputVector, learn, activeArray)
+
+    sp2 = pickle.loads(pickle.dumps(sp1))
+    for i in xrange(numRecords/2+1,numRecords):
+      activeArray1 = numpy.zeros(numColumns).astype(uintType)
+      activeArray2 = numpy.zeros(numColumns).astype(uintType)
+      inputVector = inputMatrix[i,:]
+      learn = (randomState.rand() > 0.5)
+      sp1.compute(inputVector, learn, activeArray1)
+      sp2.compute(inputVector, learn, activeArray2)
+      self.assertListEqual(list(activeArray1), list(activeArray2))
+
+
+  def runCaptainProtoSerialize(self, imp, params, seed = None):
+    randomState = getNumpyRandomGenerator(seed)
+    sp1 = CreateSP(imp, params)
+    numColumns = sp1.getNumColumns()
+    numInputs = sp1.getNumInputs()
+    threshold = 0.8
+    inputMatrix = (
+      randomState.rand(numRecords,numInputs) > threshold).astype(uintType)
+
+    for i in xrange(numRecords/2):
+      activeArray = numpy.zeros(numColumns).astype(uintType)
+      inputVector = inputMatrix[i,:]
+      learn = (randomState.rand() > 0.5)
+      sp1.compute(inputVector, learn, activeArray)
+
+    import pdb; pdb.set_trace()
+    sp1.savePath()
 
     sp2 = pickle.loads(pickle.dumps(sp1))
     for i in xrange(numRecords/2+1,numRecords):
@@ -336,7 +366,7 @@ class SpatialPoolerCompatabilityTest(unittest.TestCase):
     self.runSideBySide(params, convertEveryIteration = True)
 
 
-  def testSerialization(self):
+  def testProtoSerialization(self):
     params = {
       'inputDimensions' : [2,4,5],
       'columnDimensions' : [4,3,3],
@@ -356,12 +386,21 @@ class SpatialPoolerCompatabilityTest(unittest.TestCase):
       'seed' : 19,
       'spVerbosity' : 0
     }
-    sp1 = CreateSP("py", params)
-    sp2 = pickle.loads(pickle.dumps(sp1))
-    self.compare(sp1, sp2)
 
-    sp1 = CreateSP("cpp", params)
-    sp2 = pickle.loads(pickle.dumps(sp1))
+    print "creating first spatial pooler"
+    sp1 = CreateSP("capnp", params)
+    #import pdb; pdb.set_trace()
+
+    print "saving"
+    sp1.save("test_save.bin")
+
+    print "creating second spatial pooler"
+    sp2 = CreateSP("capnp")
+
+    print "loading"
+    sp2.load("test_save.bin")
+
+    print "comparing"
     self.compare(sp1, sp2)
 
 
@@ -388,6 +427,27 @@ class SpatialPoolerCompatabilityTest(unittest.TestCase):
     self.runSerialize("py", params)
     self.runSerialize("cpp", params)
 
+  def testCapnProtoSerializationRun(self):
+    params = {
+      'inputDimensions' : [2,4,5],
+      'columnDimensions' : [4,3,3],
+      'potentialRadius' : 30,
+      'potentialPct' : 0.7,
+      'globalInhibition' : False,
+      'localAreaDensity' : 0.23,
+      'numActiveColumnsPerInhArea' : 0,
+      'stimulusThreshold' : 2,
+      'synPermInactiveDec' : 0.02,
+      'synPermActiveInc' : 0.1,
+      'synPermConnected' : 0.12,
+      'minPctOverlapDutyCycle' : 0.011,
+      'minPctActiveDutyCycle' : 0.052,
+      'dutyCyclePeriod' : 25,
+      'maxBoost' : 11.0,
+      'seed' : 19,
+      'spVerbosity' : 0
+    }
+    self.runCaptainProtoSerialize("capnp", params)
 
 if __name__ == "__main__":
   unittest.main()
