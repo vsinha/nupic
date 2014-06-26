@@ -596,9 +596,9 @@ class SpatialPooler(object):
   def getOverlapDutyCycles(self, overlapDutyCycles):
     """Returns the overlap duty cycles for all columns. 'overlapDutyCycles'
     size must match the number of columns"""
-    # TODO
-    overlapDutyCycles[:] = self._proto.overlapDutyCycles[:]
 
+    for item in self._proto.overlapDutyCycles:
+      numpy.append(overlapDutyCycles, item)
 
   def setOverlapDutyCycles(self, overlapDutyCycles):
     """Sets the overlap duty cycles for all columns. 'overlapDutyCycles'
@@ -611,7 +611,8 @@ class SpatialPooler(object):
     """Returns the activity duty cycles for all columns. 'activeDutyCycles'
     size must match the number of columns"""
     # TODO
-    activeDutyCycles[:] = self._proto.activeDutyCycles[:]
+    for item in self._proto.activeDutyCycles:
+      numpy.append(activeDutyCycles, item)
 
 
   def setActiveDutyCycles(self, activeDutyCycles):
@@ -625,7 +626,8 @@ class SpatialPooler(object):
     """Returns the minimum overlap duty cycles for all columns.
     '_minOverlapDutyCycles' size must match the number of columns"""
     # TODO
-    minOverlapDutyCycles[:] = self._proto.minOverlapDutyCycles[:]
+    for item in self._proto.minOverlapDutyCycles:
+      numpy.append(minOverlapDutyCycles, item)
 
 
   def setMinOverlapDutyCycles(self, minOverlapDutyCycles):
@@ -639,7 +641,8 @@ class SpatialPooler(object):
     """Returns the minimum activity duty cycles for all columns.
     '_minActiveDutyCycles' size must match the number of columns"""
     # TODO
-    minActiveDutyCycles[:] = self._proto.minActiveDutyCycles[:]
+    for item in self._proto.minActiveDutyCycles:
+      numpy.append(minActiveDutyCycles, item)
 
 
   def setMinActiveDutyCycles(self, minActiveDutyCycles):
