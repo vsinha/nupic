@@ -31,8 +31,11 @@ struct SpatialPooler {
   iterationNum @25 :UInt32;
   iterationLearnNum @26 :UInt32;
 
-  # List length equals number of columns, elements are indices of input bits
+  # List length equals number of bits total, elements are indices of input bits
   # in potential pool
+  # We're on a new row if the current index number is lower than the previous
+  # (ie: {0, 1, 5, 6, 3, 6, 7} -> {0, 1, 5, 6}, {3, 6, 7}
+  # This way we can store as a simple list
   # For serialization only - sparse matrix is used during execution
   potentialPools @27 :List(UInt32);
 
