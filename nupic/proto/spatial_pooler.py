@@ -1,7 +1,7 @@
 # ----------------------------------------------------------------------
 # Numenta Platform for Intelligent Computing (NuPIC)
-# Copyright (C) 2014, Numenta, Inc.  Unless you have purchased from
-# Numenta, Inc. a separate commercial license for this software code, the
+# Copyright (C) 2013-2014, Numenta, Inc.  Unless you have an agreement
+# with Numenta, Inc., for a separate license for this software code, the
 # following terms and conditions apply:
 #
 # This program is free software: you can redistribute it and/or modify
@@ -19,18 +19,13 @@
 # http://numenta.org/licenses/
 # ----------------------------------------------------------------------
 
-"""TODO"""
-
 import itertools
 import numpy
-
-import capnp
 
 from nupic.bindings.math import (SM32 as SparseMatrix,
                                  SM_01_32_32 as SparseBinaryMatrix,
                                  GetNTAReal,
                                  Random as NupicRandom)
-from nupic.proto import spatial_pooler_capnp
 
 realDType = GetNTAReal()
 uintType = "uint32"
@@ -77,16 +72,16 @@ class SpatialPooler(object):
     inputDimensions:      A list representing the dimensions of the input
                           vector. Format is [height, width, depth, ...], where
                           each value represents the size of the dimension. For a
-                          topology of one dimesion with 100 inputs use 100, or
+                          topology of one dimension with 100 inputs use 100, or
                           [100]. For a two dimensional topology of 10x5 use
                           [10,5].
     columnDimensions:     A list representing the dimensions of the columns in
                           the region. Format is [height, width, depth, ...],
                           where each value represents the size of the dimension.
-                          For a topology of one dimesion with 2000 columns use
+                          For a topology of one dimension with 2000 columns use
                           2000, or [2000]. For a three dimensional topology of
                           32x64x16 use [32, 64, 16].
-    potentialRadius:      This parameter deteremines the extent of the input
+    potentialRadius:      This parameter determines the extent of the input
                           that each column can potentially be connected to.
                           This can be thought of as the input bits that
                           are visible to each column, or a 'receptiveField' of
@@ -123,7 +118,7 @@ class SpatialPooler(object):
                           inhibition area).
     numActivePerInhArea:  An alternate way to control the density of the active
                           columns. If numActivePerInhArea is specified then
-                          localAreaDensity must less than 0, and vice versa.
+                          localAreaDensity must be less than 0, and vice versa.
                           When using numActivePerInhArea, the inhibition logic
                           will insure that at most 'numActivePerInhArea'
                           columns remain ON within a local inhibition area (the
@@ -156,7 +151,7 @@ class SpatialPooler(object):
                           how often a column should have at least
                           stimulusThreshold active inputs. Periodically, each
                           column looks at the overlap duty cycle of
-                          all other column within its inhibition radius and
+                          all other columns within its inhibition radius and
                           sets its own internal minimal acceptable duty cycle
                           to: minPctDutyCycleBeforeInh * max(other columns'
                           duty cycles).
@@ -184,7 +179,7 @@ class SpatialPooler(object):
                           values make it take longer to respond to changes in
                           boost or synPerConnectedCell. Shorter values make it
                           more unstable and likely to oscillate.
-     maxBoost:            The maximum overlap boost factor. Each column's
+    maxBoost:             The maximum overlap boost factor. Each column's
                           overlap gets multiplied by a boost factor
                           before it gets considered for inhibition.
                           The actual boost factor for a column is number
@@ -204,72 +199,68 @@ class SpatialPooler(object):
 
     assert(numColumns > 0)
     assert(numInputs > 0)
+    assert(inputDimensions.size == columnDimensions.size)
     assert (numActiveColumnsPerInhArea > 0 or
            (localAreaDensity > 0 and localAreaDensity <= 0.5))
 
-
-    self._proto = spatial_pooler_capnp.SpatialPooler.new_message()
-
-    # initialize the random number generators
     self._seed(seed)
 
     # save arguments
-    self._proto.numInputs = int(numInputs)
-    self._proto.numColumns = int(numColumns)
-    colDims = self._proto.init("columnDimensions", len(columnDimensions))
-    for i, dim in enumerate(columnDimensions):
-      colDims[i] = int(dim)
-    inpDims = self._proto.init("inputDimensions", len(inputDimensions))
-    for i, dim in enumerate(inputDimensions):
-      inpDims[i] = int(dim)
-    self._proto.potentialRadius = int(min(potentialRadius, numInputs))
-    self._proto.potentialPct = potentialPct
-    self._proto.globalInhibition = globalInhibition
-    self._proto.numActiveColumnsPerInhArea = int(numActiveColumnsPerInhArea)
-    self._proto.localAreaDensity = localAreaDensity
-    self._proto.stimulusThreshold = stimulusThreshold
-    self._proto.synPermInactiveDec = synPermInactiveDec
-    self._proto.synPermActiveInc = synPermActiveInc
-    self._proto.synPermBelowStimulusInc = synPermConnected / 10.0
-    self._proto.synPermConnected = synPermConnected
-    self._proto.minPctOverlapDutyCycles = minPctOverlapDutyCycle
-    self._proto.minPctActiveDutyCycles = minPctActiveDutyCycle
-    self._proto.dutyCyclePeriod = dutyCyclePeriod
-    self._proto.maxBoost = maxBoost
-    self._proto.spVerbosity = spVerbosity
+    self._numInputs = int(numInputs)
+    self._numColumns = int(numColumns)
+    self._columnDimensions = columnDimensions
+    self._inputDimensions = inputDimensions
+    self._potentialRadius = int(min(potentialRadius, numInputs))
+    self._potentialPct = potentialPct
+    self._globalInhibition = globalInhibition
+    self._numActiveColumnsPerInhArea = int(numActiveColumnsPerInhArea)
+    self._localAreaDensity = localAreaDensity
+    self._stimulusThreshold = stimulusThreshold
+    self._synPermInactiveDec = synPermInactiveDec
+    self._synPermActiveInc = synPermActiveInc
+    self._synPermBelowStimulusInc = synPermConnected / 10.0
+    self._synPermConnected = synPermConnected
+    self._minPctOverlapDutyCycles = minPctOverlapDutyCycle
+    self._minPctActiveDutyCycles = minPctActiveDutyCycle
+    self._dutyCyclePeriod = dutyCyclePeriod
+    self._maxBoost = maxBoost
+    self._spVerbosity = spVerbosity
 
     # Extra parameter settings
-    self._proto.synPermMin = 0.0
-    self._proto.synPermMax = 1.0
-    self._proto.synPermTrimThreshold = synPermActiveInc / 2.0
-    assert(self._proto.synPermTrimThreshold < self._proto.synPermConnected)
-    self._proto.updatePeriod = 50
+    self._synPermMin = 0.0
+    self._synPermMax = 1.0
+    self._synPermTrimThreshold = synPermActiveInc / 2.0
+    assert(self._synPermTrimThreshold < self._synPermConnected)
+    self._updatePeriod = 50
     initConnectedPct = 0.5
 
     # Internal state
-    self._proto.version = 1
-    self._proto.iterationNum = 0
-    self._proto.iterationLearnNum = 0
+    self._version = 1.0
+    self._iterationNum = 0
+    self._iterationLearnNum = 0
+
+    # initialize the random number generators
+    self._seed(seed)
 
     # Store the set of all inputs that are within each column's potential pool.
     # 'potentialPools' is a matrix, whose rows represent cortical columns, and
     # whose columns represent the input bits. if potentialPools[i][j] == 1,
     # then input bit 'j' is in column 'i's potential pool. A column can only be
     # connected to inputs in its potential pool. The indices refer to a
-    # falttenned version of both the inputs and columns. Namely, irrespective
+    # flattened version of both the inputs and columns. Namely, irrespective
     # of the topology of the inputs and columns, they are treated as being a
     # one dimensional array. Since a column is typically connected to only a
     # subset of the inputs, many of the entries in the matrix are 0. Therefore
-    # the the potentialPool matrix is stored using the SparseBinaryMatrix
-    # class, to reduce memory footprint and compuation time of algorithms that
-    # require iterating over the data strcuture.
+    # the potentialPool matrix is stored using the SparseBinaryMatrix
+    # class, to reduce memory footprint and computation time of algorithms that
+    # require iterating over the data structure.
     self._potentialPools = SparseBinaryMatrix(numInputs)
     self._potentialPools.resize(numColumns, numInputs)
 
     # Initialize the permanences for each column. Similar to the
-    # 'self._potentialPools', the permances are stored in a matrix whose rows
-    # represent the cortial columns, and whose columns represent the input
-    # bits. if self._permanences[i][j] = 0.2, then the synapse connecting
+    # 'self._potentialPools', the permanences are stored in a matrix whose rows
+    # represent the cortical columns, and whose columns represent the input
+    # bits. If self._permanences[i][j] = 0.2, then the synapse connecting
     # cortical column 'i' to input bit 'j'  has a permanence of 0.2. Here we
     # also use the SparseMatrix class to reduce the memory footprint and
     # computation time of algorithms that require iterating over the data
@@ -279,13 +270,13 @@ class SpatialPooler(object):
 
     # Initialize a tiny random tie breaker. This is used to determine winning
     # columns where the overlaps are identical.
-    tieBreaker = self._proto.init("tieBreaker", numColumns)
-    for i in xrange(numColumns):
-      tieBreaker[i] = 0.01 * self._random.getReal64()
+    self._tieBreaker = 0.01*numpy.array([self._random.getReal64() for i in
+                                        xrange(self._numColumns)])
+
 
     # 'self._connectedSynapses' is a similar matrix to 'self._permanences'
-    # (rows represent cortial columns, columns represent input bits) whose
-    # entries represent whether the cortial column is connected to the input
+    # (rows represent cortical columns, columns represent input bits) whose
+    # entries represent whether the cortical column is connected to the input
     # bit, i.e. its permanence value is greater than 'synPermConnected'. While
     # this information is readily available from the 'self._permanence' matrix,
     # it is stored separately for efficiency purposes.
@@ -296,373 +287,346 @@ class SpatialPooler(object):
     # a sum of each row of 'self._connectedSynapses'. again, while this
     # information is readily available from 'self._connectedSynapses', it is
     # stored separately for efficiency purposes.
-    connectedCounts = self._proto.init("connectedCounts", numColumns)
-    for i in xrange(numColumns):
-      connectedCounts[i] = 0
+    self._connectedCounts = numpy.zeros(numColumns, dtype=realDType)
 
-    # Initialize the set of permanence values for each columns. Ensure that
+    # Initialize the set of permanence values for each column. Ensure that
     # each column is connected to enough input bits to allow it to be
-    # activated
+    # activated.
     for i in xrange(numColumns):
       potential = self._mapPotential(i, wrapAround=True)
       self._potentialPools.replaceSparseRow(i, potential.nonzero()[0])
       perm = self._initPermanence(potential, initConnectedPct)
       self._updatePermanencesForColumn(perm, i, raisePerm=True)
 
-    overlapDutyCycles = self._proto.init("overlapDutyCycles", numColumns)
-    activeDutyCycles = self._proto.init("activeDutyCycles", numColumns)
-    minOverlapDutyCycles = self._proto.init("minOverlapDutyCycles", numColumns)
-    minActiveDutyCycles = self._proto.init("minActiveDutyCycles", numColumns)
-    boostFactors = self._proto.init("boostFactors", numColumns)
-    for i in xrange(numColumns):
-      overlapDutyCycles[i] = 0.0
-      activeDutyCycles[i] = 0.0
-      minOverlapDutyCycles[i] = 0.0
-      minActiveDutyCycles[i] = 0.0
-      boostFactors[i] = 1.0
+
+    self._overlapDutyCycles = numpy.zeros(numColumns, dtype=realDType)
+    self._activeDutyCycles = numpy.zeros(numColumns, dtype=realDType)
+    self._minOverlapDutyCycles = numpy.zeros(numColumns,
+                                             dtype=realDType)
+    self._minActiveDutyCycles = numpy.zeros(numColumns,
+                                            dtype=realDType)
+    self._boostFactors = numpy.ones(numColumns, dtype=realDType)
 
     # The inhibition radius determines the size of a column's local
     # neighborhood. of a column. A cortical column must overcome the overlap
     # score of columns in his neighborhood in order to become actives. This
     # radius is updated every learning round. It grows and shrinks with the
     # average number of connected synapses per column.
-    self._proto.inhibitionRadius = 0
+    self._inhibitionRadius = 0
     self._updateInhibitionRadius()
 
-    if self._proto.spVerbosity > 0:
+    if self._spVerbosity > 0:
       self.printParameters()
 
-  def save(self, filename):
-    with open(filename, "w+b") as f:
-      self._proto.write(f)
-
-  def load(self, filename):
-    with open(filename, "rb") as f:
-      self._proto = spatial_pooler_capnp.SpatialPooler.read(f)
 
   def getColumnDimensions(self):
     """Returns the dimensions of the columns in the region"""
-    return self._proto.columnDimensions
+    return self._columnDimensions
 
 
   def getInputDimensions(self):
     """Returns the dimensions of the input vector"""
-    return self._proto.inputDimensions
+    return self._inputDimensions
 
 
   def getNumColumns(self):
     """Returns the total number of columns"""
-    return self._proto.numColumns
+    return self._numColumns
 
 
   def getNumInputs(self):
     """Returns the total number of inputs"""
-    return self._proto.numInputs
+    return self._numInputs
 
 
   def getPotentialRadius(self):
     """Returns the potential radius"""
-    return self._proto.potentialRadius
+    return self._potentialRadius
 
 
   def setPotentialRadius(self, potentialRadius):
     """Sets the potential radius"""
-    self._proto.potentialRadius = potentialRadius
+    self._potentialRadius = potentialRadius
 
 
   def getPotentialPct(self):
     """Returns the potential percent"""
-    return self._proto.potentialPct
+    return self._potentialPct
 
 
   def setPotentialPct(self, potentialPct):
     """Sets the potential percent"""
-    self._proto.potentialPct = potentialPct
+    self._potentialPct = potentialPct
 
 
   def getGlobalInhibition(self):
     """Returns whether global inhibition is enabled"""
-    return self._proto.globalInhibition
+    return self._globalInhibition
 
 
   def setGlobalInhibition(self, globalInhibition):
     """Sets global inhibition"""
-    self._proto.globalInhibition = globalInhibition
+    self._globalInhibition = globalInhibition
 
 
   def getNumActiveColumnsPerInhArea(self):
     """Returns the number of active columns per inhibition area. Returns a
     value less than 0 if parameter is unused"""
-    return self._proto.numActiveColumnsPerInhArea
+    return self._numActiveColumnsPerInhArea
 
 
   def setNumActiveColumnsPerInhArea(self, numActiveColumnsPerInhArea):
     """Sets the number of active columns per inhibition area. Invalidates the
     'localAreaDensity' parameter"""
     assert(numActiveColumnsPerInhArea > 0)
-    self._proto.numActiveColumnsPerInhArea = numActiveColumnsPerInhArea
-    self._proto.localAreaDensity = 0
+    self._numActiveColumnsPerInhArea = numActiveColumnsPerInhArea
+    self._localAreaDensity = 0
 
 
   def getLocalAreaDensity(self):
     """Returns the local area density. Returns a value less than 0 if parameter
     is unused"""
-    return self._proto.localAreaDensity
+    return self._localAreaDensity
 
 
   def setLocalAreaDensity(self, localAreaDensity):
     """Sets the local area density. Invalidates the 'numActivePerInhArea'
     parameter"""
     assert(localAreaDensity > 0 and localAreaDensity <= 1)
-    self._proto.localAreaDensity = localAreaDensity
-    self._proto.numActiveColumnsPerInhArea = 0
+    self._localAreaDensity = localAreaDensity
+    self._numActiveColumnsPerInhArea = 0
 
 
   def getStimulusThreshold(self):
     """Returns the stimulus threshold"""
-    return self._proto.stimulusThreshold
+    return self._stimulusThreshold
 
 
   def setStimulusThreshold(self, stimulusThreshold):
     """Sets the stimulus threshold"""
-    self._proto.stimulusThreshold = stimulusThreshold
+    self._stimulusThreshold = stimulusThreshold
 
 
   def getInhibitionRadius(self):
     """Returns the inhibition radius"""
-    return self._proto.inhibitionRadius
+    return self._inhibitionRadius
 
 
   def setInhibitionRadius(self, inhibitionRadius):
     """Sets the inhibition radius"""
-    self._proto.inhibitionRadius = inhibitionRadius
+    self._inhibitionRadius = inhibitionRadius
 
 
   def getDutyCyclePeriod(self):
     """Returns the duty cycle period"""
-    return self._proto.dutyCyclePeriod
+    return self._dutyCyclePeriod
 
 
   def setDutyCyclePeriod(self, dutyCyclePeriod):
     """Sets the duty cycle period"""
-    self._proto.dutyCyclePeriod = dutyCyclePeriod
+    self._dutyCyclePeriod = dutyCyclePeriod
 
 
   def getMaxBoost(self):
     """Returns the maximum boost value"""
-    return self._proto.maxBoost
+    return self._maxBoost
 
 
   def setMaxBoost(self, maxBoost):
     """Sets the maximum boost value"""
-    self._proto.maxBoost = maxBoost
+    self._maxBoost = maxBoost
 
 
   def getIterationNum(self):
     """Returns the iteration number"""
-    return self._proto.iterationNum
+    return self._iterationNum
 
 
   def setIterationNum(self, iterationNum):
     """Sets the iteration number"""
-    self._proto.iterationNum = iterationNum
+    self._iterationNum = iterationNum
 
 
   def getIterationLearnNum(self):
     """Returns the learning iteration number"""
-    return self._proto.iterationLearnNum
+    return self._iterationLearnNum
 
 
   def setIterationLearnNum(self, iterationLearnNum):
     """Sets the learning iteration number"""
-    self._proto.iterationLearnNum = iterationLearnNum
+    self._iterationLearnNum = iterationLearnNum
 
 
   def getSpVerbosity(self):
     """Returns the verbosity level"""
-    return self._proto.spVerbosity
+    return self._spVerbosity
 
 
   def setSpVerbosity(self, spVerbosity):
     """Sets the verbosity level"""
-    self._proto.spVerbosity = spVerbosity
+    self._spVerbosity = spVerbosity
 
 
   def getUpdatePeriod(self):
     """Returns the update period"""
-    return self._proto.updatePeriod
+    return self._updatePeriod
 
 
   def setUpdatePeriod(self, updatePeriod):
     """Sets the update period"""
-    self._proto.updatePeriod = updatePeriod
+    self._updatePeriod = updatePeriod
 
 
   def getSynPermTrimThreshold(self):
     """Returns the permanence trim threshold"""
-    return self._proto.synPermTrimThreshold
+    return self._synPermTrimThreshold
 
 
   def setSynPermTrimThreshold(self, synPermTrimThreshold):
     """Sets the permanence trim threshold"""
-    self._proto.synPermTrimThreshold = synPermTrimThreshold
+    self._synPermTrimThreshold = synPermTrimThreshold
 
 
   def getSynPermActiveInc(self):
     """Returns the permanence increment amount for active synapses
     inputs"""
-    return self._proto.synPermActiveInc
+    return self._synPermActiveInc
 
 
   def setSynPermActiveInc(self, synPermActiveInc):
     """Sets the permanence increment amount for active synapses"""
-    self._proto.synPermActiveInc = synPermActiveInc
+    self._synPermActiveInc = synPermActiveInc
 
 
   def getSynPermInactiveDec(self):
     """Returns the permanence decrement amount for inactive synapses"""
-    return self._proto.synPermInactiveDec
+    return self._synPermInactiveDec
 
 
   def setSynPermInactiveDec(self, synPermInactiveDec):
     """Sets the permanence decrement amount for inactive synapses"""
-    self._proto.synPermInactiveDec = synPermInactiveDec
+    self._synPermInactiveDec = synPermInactiveDec
 
 
   def getSynPermBelowStimulusInc(self):
     """Returns the permanence increment amount for columns that have not been
     recently active """
-    return self._proto.synPermBelowStimulusInc
+    return self._synPermBelowStimulusInc
 
 
   def setSynPermBelowStimulusInc(self, synPermBelowStimulusInc):
     """Sets the permanence increment amount for columns that have not been
     recently active """
-    self._proto.synPermBelowStimulusInc = synPermBelowStimulusInc
+    self._synPermBelowStimulusInc = synPermBelowStimulusInc
 
 
   def getSynPermConnected(self):
     """Returns the permanence amount that qualifies a synapse as
     being connected"""
-    return self._proto.synPermConnected
+    return self._synPermConnected
 
 
   def setSynPermConnected(self, synPermConnected):
     """Sets the permanence amount that qualifies a synapse as being
     connected"""
-    self._proto.synPermConnected = synPermConnected
+    self._synPermConnected = synPermConnected
 
 
   def getMinPctOverlapDutyCycles(self):
     """Returns the minimum tolerated overlaps, given as percent of
     neighbors overlap score"""
-    return self._proto.minPctOverlapDutyCycles
+    return self._minPctOverlapDutyCycles
 
 
   def setMinPctOverlapDutyCycles(self, minPctOverlapDutyCycles):
     """Sets the minimum tolerated activity duty cycle, given as percent of
     neighbors' activity duty cycle"""
-    self._proto.minPctOverlapDutyCycles = minPctOverlapDutyCycles
+    self._minPctOverlapDutyCycles = minPctOverlapDutyCycles
 
 
   def getMinPctActiveDutyCycles(self):
     """Returns the minimum tolerated activity duty cycle, given as percent of
     neighbors' activity duty cycle"""
-    return self._proto.minPctActiveDutyCycles
+    return self._minPctActiveDutyCycles
 
 
   def setMinPctActiveDutyCycles(self, minPctActiveDutyCycles):
     """Sets the minimum tolerated activity duty, given as percent of
     neighbors' activity duty cycle"""
-    self._proto.minPctActiveDutyCycles = minPctActiveDutyCycles
+    self._minPctActiveDutyCycles = minPctActiveDutyCycles
 
 
   def getBoostFactors(self, boostFactors):
     """Returns the boost factors for all columns. 'boostFactors' size must
     match the number of columns"""
-    # SCOTT TODO
-    #boostFactors[:] = self._proto.boostFactors[:]
-    for i in xrange(self._proto.numColumns):
-      boostFactors[i] = self._proto.boostFactors[i]
+    boostFactors[:] = self._boostFactors[:]
 
 
   def setBoostFactors(self, boostFactors):
     """Sets the boost factors for all columns. 'boostFactors' size must match
     the number of columns"""
-    # TODO
-    self._proto.boostFactors[:] = boostFactors[:]
+    self._boostFactors[:] = boostFactors[:]
 
 
   def getOverlapDutyCycles(self, overlapDutyCycles):
     """Returns the overlap duty cycles for all columns. 'overlapDutyCycles'
     size must match the number of columns"""
+    overlapDutyCycles[:] = self._overlapDutyCycles[:]
 
-    for item in self._proto.overlapDutyCycles:
-      numpy.append(overlapDutyCycles, item)
 
   def setOverlapDutyCycles(self, overlapDutyCycles):
     """Sets the overlap duty cycles for all columns. 'overlapDutyCycles'
     size must match the number of columns"""
-    # TODO
-    self._proto.overlapDutyCycles[:] = overlapDutyCycles
+    self._overlapDutyCycles[:] = overlapDutyCycles
 
 
   def getActiveDutyCycles(self, activeDutyCycles):
     """Returns the activity duty cycles for all columns. 'activeDutyCycles'
     size must match the number of columns"""
-    # TODO
-    for item in self._proto.activeDutyCycles:
-      numpy.append(activeDutyCycles, item)
+    activeDutyCycles[:] = self._activeDutyCycles[:]
 
 
   def setActiveDutyCycles(self, activeDutyCycles):
     """Sets the activity duty cycles for all columns. 'activeDutyCycles'
     size must match the number of columns"""
-    # TODO
-    self._proto.activeDutyCycles[:] = activeDutyCycles
+    self._activeDutyCycles[:] = activeDutyCycles
 
 
   def getMinOverlapDutyCycles(self, minOverlapDutyCycles):
     """Returns the minimum overlap duty cycles for all columns.
     '_minOverlapDutyCycles' size must match the number of columns"""
-    # TODO
-    for item in self._proto.minOverlapDutyCycles:
-      numpy.append(minOverlapDutyCycles, item)
+    minOverlapDutyCycles[:] = self._minOverlapDutyCycles[:]
 
 
   def setMinOverlapDutyCycles(self, minOverlapDutyCycles):
     """Sets the minimum overlap duty cycles for all columns.
     '_minOverlapDutyCycles' size must match the number of columns"""
-    # TODO
-    self._proto.minOverlapDutyCycles[:] = minOverlapDutyCycles[:]
+    self._minOverlapDutyCycles[:] = minOverlapDutyCycles[:]
 
 
   def getMinActiveDutyCycles(self, minActiveDutyCycles):
     """Returns the minimum activity duty cycles for all columns.
     '_minActiveDutyCycles' size must match the number of columns"""
-    # TODO
-    for item in self._proto.minActiveDutyCycles:
-      numpy.append(minActiveDutyCycles, item)
+    minActiveDutyCycles[:] = self._minActiveDutyCycles[:]
 
 
   def setMinActiveDutyCycles(self, minActiveDutyCycles):
     """Sets the minimum activity duty cycles for all columns.
     '_minActiveDutyCycles' size must match the number of columns"""
-    # TODO
-    self._proto.minActiveDutyCycles[:] = minActiveDutyCycles[:]
+    self._minActiveDutyCycles = minActiveDutyCycles
 
 
   def getPotential(self, column, potential):
     """Returns the potential mapping for a given column. 'potential' size
     must match the number of inputs"""
-    assert(column < self._proto.numColumns)
-    potential[:] = self.potentialPools.getRow(column)
+    assert(column < self._numColumns)
+    potential[:] = self._potentialPools.getRow(column)
 
 
   def setPotential(self, column, potential):
     """Sets the potential mapping for a given column. 'potential' size
     must match the number of inputs"""
-    assert(column < self._proto.numColumns)
+    assert(column < self._numColumns)
     potentialSparse = numpy.where(potential > 0)[0]
     self._potentialPools.replaceSparseRow(column, potentialSparse)
 
@@ -670,21 +634,21 @@ class SpatialPooler(object):
   def getPermanence(self, column, permanence):
     """Returns the permanence values for a given column. 'permanence' size
     must match the number of inputs"""
-    assert(column < self._proto.numColumns)
+    assert(column < self._numColumns)
     permanence[:] = self._permanences.getRow(column)
 
 
   def setPermanence(self, column, permanence):
     """Sets the permanence values for a given column. 'permanence' size
     must match the number of inputs"""
-    assert(column < self._proto.numColumns)
+    assert(column < self._numColumns)
     self._updatePermanencesForColumn(permanence, column, raisePerm=False)
 
 
   def getConnectedSynapses(self, column, connectedSynapses):
     """Returns the connected synapses for a given column.
     'connectedSynapses' size must match the number of inputs"""
-    assert(column < self._proto.numColumns)
+    assert(column < self._numColumns)
     connectedSynapses[:] = self._connectedSynapses.getRow(column)
 
 
@@ -703,7 +667,7 @@ class SpatialPooler(object):
 
     Parameters:
     ----------------------------
-    inputVector:    a numpy array of 0's and 1's thata comprises the input to
+    inputVector:    a numpy array of 0's and 1's that comprises the input to
                     the spatial pooler. The array will be treated as a one
                     dimensional array, therefore the dimensions of the array
                     do not have to much the exact dimensions specified in the
@@ -723,7 +687,7 @@ class SpatialPooler(object):
                     with 1's at the indices of the active columns, and 0's
                     everywhere else.
     """
-    assert (numpy.size(inputVector) == self._proto.numInputs)
+    assert (numpy.size(inputVector) == self._numInputs)
     self._updateBookeepingVars(learn)
     inputVector = numpy.array(inputVector, dtype=realDType)
     inputVector.reshape(-1)
@@ -731,7 +695,7 @@ class SpatialPooler(object):
 
     # Apply boosting when learning is on
     if learn:
-      boostedOverlaps = self._proto.boostFactors * overlaps
+      boostedOverlaps = self._boostFactors * overlaps
     else:
       boostedOverlaps = overlaps
 
@@ -765,11 +729,7 @@ class SpatialPooler(object):
     ----------------------------
     activeColumns:  An array containing the indices of the active columns
     """
-    neverLearned = []
-    for i in xrange(self._proto.numColumns):
-      if self._proto.activeDutyCycles[i] == 0:
-        neverLearned.append(i)
-    #neverLearned = numpy.where(self._activeDutyCycles == 0)[0]
+    neverLearned = numpy.where(self._activeDutyCycles == 0)[0]
     return numpy.array(list(set(activeColumns) - set(neverLearned)))
 
 
@@ -778,8 +738,7 @@ class SpatialPooler(object):
     Updates the minimum duty cycles defining normal activity for a column. A
     column with activity duty cycle below this minimum threshold is boosted.
     """
-    if (self._proto.globalInhibition or
-        self._proto.inhibitionRadius > self._proto.numInputs):
+    if self._globalInhibition or self._inhibitionRadius > self._numInputs:
       self._updateMinDutyCyclesGlobal()
     else:
       self._updateMinDutyCyclesLocal()
@@ -790,15 +749,15 @@ class SpatialPooler(object):
     Updates the minimum duty cycles in a global fashion. Sets the minimum duty
     cycles for the overlap and activation of all columns to be a percent of the
     maximum in the region, specified by minPctOverlapDutyCycle and
-    minPctActiveDutyCycle respectively. Functionaly it is equivalent to
-    _updateMinDutyCyclesLocal, but this function exploits the globalilty of the
-    compuation to perform it in a straightforward, and more efficient manner.
+    minPctActiveDutyCycle respectively. Functionality it is equivalent to
+    _updateMinDutyCyclesLocal, but this function exploits the globality of the
+    computation to perform it in a straightforward, and more efficient manner.
     """
     self._minOverlapDutyCycles.fill(
-        self._proto.minPctOverlapDutyCycles * max(self._proto.overlapDutyCycles)
+        self._minPctOverlapDutyCycles * self._overlapDutyCycles.max()
       )
-    self._proto.minActiveDutyCycles.fill(
-        self._proto.minPctActiveDutyCycles * max(self._proto.activeDutyCycles)
+    self._minActiveDutyCycles.fill(
+        self._minPctActiveDutyCycles * self._activeDutyCycles.max()
       )
 
 
@@ -810,17 +769,17 @@ class SpatialPooler(object):
     _updateMinDutyCyclesGlobal, here the values can be quite different for
     different columns.
     """
-    for i in xrange(self._proto.numColumns):
+    for i in xrange(self._numColumns):
       maskNeighbors = numpy.append(i,
-        self._getNeighborsND(i, self._proto.columnDimensions,
-        self._proto.inhibitionRadius))
-      self._proto.minOverlapDutyCycles[i] = (
-        max(self._proto.overlapDutyCycles[maskNeighbors]) *
-        self._proto.minPctOverlapDutyCycles
+        self._getNeighborsND(i, self._columnDimensions,
+        self._inhibitionRadius))
+      self._minOverlapDutyCycles[i] = (
+        self._overlapDutyCycles[maskNeighbors].max() *
+        self._minPctOverlapDutyCycles
       )
-      self._proto.minActiveDutyCycles[i] = (
-        max(self._proto.activeDutyCycles[maskNeighbors]) *
-        self._proto.minPctActiveDutyCycles
+      self._minActiveDutyCycles[i] = (
+        self._activeDutyCycles[maskNeighbors].max() *
+        self._minPctActiveDutyCycles
       )
 
 
@@ -838,28 +797,26 @@ class SpatialPooler(object):
                     of synapses in a "connected state" (connected synapses)
                     that are connected to input bits which are turned on.
     activeColumns:  An array containing the indices of the active columns,
-                    the sprase set of columns which survived inhibition
+                    the sparse set of columns which survived inhibition
     """
-    overlapArray = numpy.zeros(self._proto.numColumns)
-    activeArray = numpy.zeros(self._proto.numColumns)
+    overlapArray = numpy.zeros(self._numColumns)
+    activeArray = numpy.zeros(self._numColumns)
     overlapArray[overlaps > 0] = 1
     if activeColumns.size > 0:
       activeArray[activeColumns] = 1
 
-    period = self._proto.dutyCyclePeriod
-    if (period > self._proto.iterationNum):
-      period = self._proto.iterationNum
+    period = self._dutyCyclePeriod
+    if (period > self._iterationNum):
+      period = self._iterationNum
 
-    #self._proto.overlapDutyCycles = self._updateDutyCyclesHelper(
-    self._updateDutyCyclesHelper(
-                                self._proto.overlapDutyCycles,
+    self._overlapDutyCycles = self._updateDutyCyclesHelper(
+                                self._overlapDutyCycles,
                                 overlapArray,
                                 period
                               )
 
-    #self._proto.activeDutyCycles = self._updateDutyCyclesHelper(
-    self._updateDutyCyclesHelper(
-                                self._proto.activeDutyCycles,
+    self._activeDutyCycles = self._updateDutyCyclesHelper(
+                                self._activeDutyCycles,
                                 activeArray,
                                 period
                               )
@@ -868,8 +825,8 @@ class SpatialPooler(object):
 
   def _updateInhibitionRadius(self):
     """
-    Update the inhibition radius. The inhibition radius is a meausre of the
-    square (or hypersquare) of columns that each a column is "conencted to"
+    Update the inhibition radius. The inhibition radius is a measure of the
+    square (or hypersquare) of columns that each a column is "connected to"
     on average. Since columns are are not connected to each other directly, we
     determine this quantity by first figuring out how many *inputs* a column is
     connected to, and then multiplying it by the total number of columns that
@@ -877,19 +834,19 @@ class SpatialPooler(object):
     calculations are averaged over all dimensions of inputs and columns. This
     value is meaningless if global inhibition is enabled.
     """
-    if self._proto.globalInhibition:
-      self._proto.inhibitionRadius = max(self._proto.columnDimensions)
+    if self._globalInhibition:
+      self._inhibitionRadius = self._columnDimensions.max()
       return
 
     avgConnectedSpan = numpy.average(
                           [self._avgConnectedSpanForColumnND(i)
-                          for i in xrange(self._proto.numColumns)]
+                          for i in xrange(self._numColumns)]
                         )
     columnsPerInput = self._avgColumnsPerInput()
     diameter = avgConnectedSpan * columnsPerInput
     radius = (diameter - 1) / 2.0
     radius = max(1.0, radius)
-    self._proto.inhibitionRadius = int(round(radius))
+    self._inhibitionRadius = int(round(radius))
 
 
   def _avgColumnsPerInput(self):
@@ -902,17 +859,55 @@ class SpatialPooler(object):
     """
     #TODO: extend to support different number of dimensions for inputs and
     # columns
-    colSize = len(self._proto.columnDimensions)
-    inpSize = len(self._proto.inputDimensions)
-    numDim = max(colSize, inpSize)
-    colDim = numpy.ones(numDim, dtype=realDType)
-    colDim[:colSize] = self._proto.columnDimensions
+    numDim = max(self._columnDimensions.size, self._inputDimensions.size)
+    colDim = numpy.ones(numDim)
+    colDim[:self._columnDimensions.size] = self._columnDimensions
 
     inputDim = numpy.ones(numDim)
-    inputDim[:inpSize] = self._proto.inputDimensions
+    inputDim[:self._inputDimensions.size] = self._inputDimensions
 
     columnsPerInput = colDim.astype(realDType) / inputDim
     return numpy.average(columnsPerInput)
+
+
+  def _avgConnectedSpanForColumn1D(self, index):
+    """
+    The range of connected synapses for column. This is used to
+    calculate the inhibition radius. This variation of the function only
+    supports a 1 dimensional column topology.
+
+    Parameters:
+    ----------------------------
+    index:          The index identifying a column in the permanence, potential
+                    and connectivity matrices,
+    """
+    assert(self._inputDimensions.size == 1)
+    connected = self._connectedSynapses.getRow(index).nonzero()[0]
+    if connected.size == 0:
+      return 0
+    else:
+      return max(connected) - min(connected) + 1
+
+
+  def _avgConnectedSpanForColumn2D(self, index):
+    """
+    The range of connectedSynapses per column, averaged for each dimension.
+    This value is used to calculate the inhibition radius. This variation of
+    the  function only supports a 2 dimensional column topology.
+
+    Parameters:
+    ----------------------------
+    index:          The index identifying a column in the permanence, potential
+                    and connectivity matrices,
+    """
+    assert(self._inputDimensions.size == 2)
+    connected = self._connectedSynapses.getRow(index)
+    (rows, cols) = connected.reshape(self._inputDimensions).nonzero()
+    if  rows.size == 0 and cols.size == 0:
+      return 0
+    rowSpan = rows.max() - rows.min() + 1
+    colSpan = cols.max() - cols.min() + 1
+    return numpy.average([rowSpan, colSpan])
 
 
   def _avgConnectedSpanForColumnND(self, index):
@@ -926,18 +921,21 @@ class SpatialPooler(object):
     index:          The index identifying a column in the permanence, potential
                     and connectivity matrices.
     """
-    dimensions = numpy.array(self._proto.inputDimensions)
+    dimensions = self._inputDimensions
+    bounds = numpy.cumprod(numpy.append([1], dimensions[::-1][:-1]))[::-1]
+    def toCoords(index):
+      return (index / bounds) % dimensions
 
     connected = self._connectedSynapses.getRow(index).nonzero()[0]
     if connected.size == 0:
       return 0
-    maxCoord = numpy.empty(dimensions.size)
-    minCoord = numpy.empty(dimensions.size)
+    maxCoord = numpy.empty(self._inputDimensions.size)
+    minCoord = numpy.empty(self._inputDimensions.size)
     maxCoord.fill(-1)
-    minCoord.fill(max(self._proto.inputDimensions))
+    minCoord.fill(max(self._inputDimensions))
     for i in connected:
-      maxCoord = numpy.maximum(maxCoord, numpy.unravel_index(i, dimensions))
-      minCoord = numpy.minimum(minCoord, numpy.unravel_index(i, dimensions))
+      maxCoord = numpy.maximum(maxCoord, toCoords(i))
+      minCoord = numpy.minimum(minCoord, toCoords(i))
     return numpy.average(maxCoord - minCoord + 1)
 
 
@@ -951,16 +949,16 @@ class SpatialPooler(object):
 
     Parameters:
     ----------------------------
-    inputVector:    a numpy array of 0's and 1's thata comprises the input to
+    inputVector:    a numpy array of 0's and 1's that comprises the input to
                     the spatial pooler. There exists an entry in the array
                     for every input bit.
     activeColumns:  an array containing the indices of the columns that
                     survived inhibition.
     """
     inputIndices = numpy.where(inputVector > 0)[0]
-    permChanges = numpy.zeros(self._proto.numInputs)
-    permChanges.fill(-1 * self._proto.synPermInactiveDec)
-    permChanges[inputIndices] = self._proto.synPermActiveInc
+    permChanges = numpy.zeros(self._numInputs)
+    permChanges.fill(-1 * self._synPermInactiveDec)
+    permChanges[inputIndices] = self._synPermActiveInc
     for i in activeColumns:
       perm = self._permanences.getRow(i)
       maskPotential = numpy.where(self._potentialPools.getRow(i) > 0)[0]
@@ -975,12 +973,12 @@ class SpatialPooler(object):
     overlap duty cycle that drops too much below those of their peers. The
     permanence values for such columns are increased.
     """
-    weakColumns = numpy.where(self._proto.overlapDutyCycles
-                                < self._proto.minOverlapDutyCycles)[0]
+    weakColumns = numpy.where(self._overlapDutyCycles
+                                < self._minOverlapDutyCycles)[0]
     for i in weakColumns:
       perm = self._permanences.getRow(i).astype(realDType)
       maskPotential = numpy.where(self._potentialPools.getRow(i) > 0)[0]
-      perm[maskPotential] += self._proto.synPermBelowStimulusInc
+      perm[maskPotential] += self._synPermBelowStimulusInc
       self._updatePermanencesForColumn(perm, i, raisePerm=False)
 
 
@@ -1003,12 +1001,12 @@ class SpatialPooler(object):
     mask:           the indices of the columns whose permanences need to be
                     raised.
     """
-    numpy.clip(perm, self._proto.synPermMin, self._proto.synPermMax, out=perm)
+    numpy.clip(perm, self._synPermMin, self._synPermMax, out=perm)
     while True:
-      numConnected = numpy.nonzero(perm > self._proto.synPermConnected)[0].size
-      if numConnected >= self._proto.stimulusThreshold:
+      numConnected = numpy.nonzero(perm > self._synPermConnected)[0].size
+      if numConnected >= self._stimulusThreshold:
         return
-      perm[mask] += self._proto.synPermBelowStimulusInc
+      perm[mask] += self._synPermBelowStimulusInc
 
 
   def _updatePermanencesForColumn(self, perm, index, raisePerm=True):
@@ -1016,11 +1014,11 @@ class SpatialPooler(object):
     This method updates the permanence matrix with a column's new permanence
     values. The column is identified by its index, which reflects the row in
     the matrix, and the permanence is given in 'dense' form, i.e. a full
-    arrray containing all the zeros as well as the non-zero values. It is in
+    array containing all the zeros as well as the non-zero values. It is in
     charge of implementing 'clipping' - ensuring that the permanence values are
     always between 0 and 1 - and 'trimming' - enforcing sparsity by zeroing out
     all permanence values below '_synPermTrimThreshold'. It also maintains
-    the consistency between 'self._permanences' (the matrix storeing the
+    the consistency between 'self._permanences' (the matrix storing the
     permanence values), 'self._connectedSynapses', (the matrix storing the bits
     each column is connected to), and 'self._connectedCounts' (an array storing
     the number of input bits each column is connected to). Every method wishing
@@ -1042,12 +1040,12 @@ class SpatialPooler(object):
     maskPotential = numpy.where(self._potentialPools.getRow(index) > 0)[0]
     if raisePerm:
       self._raisePermanenceToThreshold(perm, maskPotential)
-    perm[perm < self._proto.synPermTrimThreshold] = 0
-    numpy.clip(perm, self._proto.synPermMin, self._proto.synPermMax, out=perm)
-    newConnected = numpy.where(perm >= self._proto.synPermConnected)[0]
+    perm[perm < self._synPermTrimThreshold] = 0
+    numpy.clip(perm, self._synPermMin, self._synPermMax, out=perm)
+    newConnected = numpy.where(perm >= self._synPermConnected)[0]
     self._permanences.setRowFromDense(index, perm)
     self._connectedSynapses.replaceSparseRow(index, newConnected)
-    self._proto.connectedCounts[index] = newConnected.size
+    self._connectedCounts[index] = newConnected.size
 
 
   def _initPermConnected(self):
@@ -1060,8 +1058,8 @@ class SpatialPooler(object):
     Note: experimentation was done a long time ago on the best way to initialize
     permanence values, but the history for this particular scheme has been lost.
     """
-    p =  (self._proto.synPermConnected + self._random.getReal64() *
-      self._proto.synPermActiveInc / 4.0)
+    p =  (self._synPermConnected + self._random.getReal64() *
+      self._synPermActiveInc / 4.0)
 
     # Ensure we don't have too much unnecessary precision. A full 64 bits of
     # precision causes numerical stability issues across platforms and across
@@ -1075,7 +1073,7 @@ class SpatialPooler(object):
     Returns a randomly generated permanence value for a synapses that is to be
     initialized in a non-connected state.
     """
-    p = self._proto.synPermConnected * self._random.getReal64()
+    p = self._synPermConnected * self._random.getReal64()
 
     # Ensure we don't have too much unnecessary precision. A full 64 bits of
     # precision causes numerical stability issues across platforms and across
@@ -1104,8 +1102,8 @@ class SpatialPooler(object):
     # to the inputs. Initially a subset of the input bits in a
     # column's potential pool will be connected. This number is
     # given by the parameter "connectedPct"
-    perm = numpy.zeros(self._proto.numInputs)
-    for i in xrange(self._proto.numInputs):
+    perm = numpy.zeros(self._numInputs)
+    for i in xrange(self._numInputs):
       if (potential[i] < 1):
         continue
 
@@ -1117,19 +1115,19 @@ class SpatialPooler(object):
     # Clip off low values. Since we use a sparse representation
     # to store the permanence values this helps reduce memory
     # requirements.
-    perm[perm < self._proto.synPermTrimThreshold] = 0
+    perm[perm < self._synPermTrimThreshold] = 0
 
     return perm
 
 
   def _mapPotential(self, index, wrapAround=False):
     """
-    Maps a column to its input bits. This method encapsultes the topology of
+    Maps a column to its input bits. This method encapsulates the topology of
     the region. It takes the index of the column as an argument and determines
     what are the indices of the input vector that are located within the
     column's potential pool. The return value is a list containing the indices
     of the input bits. The current implementation of the base class only
-    supports a 1 dimensional topology of columsn with a 1 dimensional topology
+    supports a 1 dimensional topology of columns with a 1 dimensional topology
     of inputs. To extend this class to support 2-D topology you will need to
     override this method. Examples of the expected output of this method:
     * If the potentialRadius is greater than or equal to the entire input
@@ -1151,26 +1149,26 @@ class SpatialPooler(object):
                     region boundaries ignored.
     """
     # Distribute column over inputs uniformly
-    ratio = float(index) / max((self._proto.numColumns - 1), 1)
-    index = int((self._proto.numInputs - 1) * ratio)
+    ratio = float(index) / max((self._numColumns - 1), 1)
+    index = int((self._numInputs - 1) * ratio)
 
-    indices = numpy.array(range(2*self._proto.potentialRadius+1))
+    indices = numpy.array(range(2*self._potentialRadius+1))
     indices += index
-    indices -= self._proto.potentialRadius
+    indices -= self._potentialRadius
     if wrapAround:
-      indices %= self._proto.numInputs
+      indices %= self._numInputs
     else:
       indices = indices[
-        numpy.logical_and(indices >= 0, indices < self._proto.numInputs)]
+        numpy.logical_and(indices >= 0, indices < self._numInputs)]
     indices = numpy.array(list(set(indices)))
 
     # Select a subset of the receptive field to serve as the
     # the potential pool
     sample = numpy.empty(int(round(
-      indices.size*self._proto.potentialPct)),dtype=uintType)
+      indices.size*self._potentialPct)),dtype=uintType)
     self._random.getUInt32Sample(indices.astype(uintType), sample)
 
-    mask = numpy.zeros(self._proto.numInputs)
+    mask = numpy.zeros(self._numInputs)
     mask[sample] = 1
     return mask
 
@@ -1197,10 +1195,7 @@ class SpatialPooler(object):
     period:         The period of the duty cycle
     """
     assert(period >= 1)
-    for i in xrange(len(dutyCycles)):
-      # TODO: Avoid cast to float
-      dutyCycles[i] = float((dutyCycles[i] * (period - 1.0) + newInput[i]) / period)
-    #return (dutyCycles * (period -1.0) + newInput) / period
+    return (dutyCycles * (period -1.0) + newInput) / period
 
 
   def _updateBoostFactors(self):
@@ -1228,23 +1223,14 @@ class SpatialPooler(object):
                    |
             minActiveDutyCycle
     """
-    for i in xrange(len(self._proto.minActiveDutyCycles)):
-      if self._proto.minActiveDutyCycles[i] > 0:
-        self._proto.boostFactors[i] = (
-            (1 - self._proto.maxBoost) /
-            self._proto.minActiveDutyCycles[i] * self._proto.activeDutyCycles[i]
-        ) + self._proto.maxBoost
 
-      if self._proto.activeDutyCycles[i] > self._proto.minActiveDutyCycles[i]:
-        self._proto.boostFactors[i] = 1.0
+    mask = numpy.where(self._minActiveDutyCycles > 0)[0]
+    self._boostFactors[mask] = ((1 - self._maxBoost) /
+      self._minActiveDutyCycles[mask] * self._activeDutyCycles[mask]
+        ).astype(realDType) + self._maxBoost
 
-    #mask = numpy.where(self._proto.minActiveDutyCycles > 0)[0]
-    #self._proto.boostFactors[mask] = ((1 - self._proto.maxBoost) /
-    #  self._proto.minActiveDutyCycles[mask] * self._proto.activeDutyCycles[mask]
-    #    ).astype(realDType) + self._proto.maxBoost
-
-    #self._proto.boostFactors[self._proto.activeDutyCycles >
-    #  self._proto.minActiveDutyCycles] = 1.0
+    self._boostFactors[self._activeDutyCycles >
+      self._minActiveDutyCycles] = 1.0
 
 
   def _updateBookeepingVars(self, learn):
@@ -1259,16 +1245,16 @@ class SpatialPooler(object):
                     of the model. setting learning to 'off' might be useful
                     for indicating separate training vs. testing sets.
     """
-    self._proto.iterationNum += 1
+    self._iterationNum += 1
     if learn:
-      self._proto.iterationLearnNum += 1
+      self._iterationLearnNum += 1
 
 
   def _calculateOverlap(self, inputVector):
     """
     This function determines each column's overlap with the current input
     vector. The overlap of a column is the number of synapses for that column
-    that are connected (permance value is greater than '_synPermConnected')
+    that are connected (permanence value is greater than '_synPermConnected')
     to input bits which are turned on. Overlap values that are lower than
     the 'stimulusThreshold' are ignored. The implementation takes advantage of
     the SpraseBinaryMatrix class to perform this calculation efficiently.
@@ -1278,14 +1264,14 @@ class SpatialPooler(object):
     inputVector:    a numpy array of 0's and 1's that comprises the input to
                     the spatial pooler.
     """
-    overlaps = numpy.zeros(self._proto.numColumns).astype(realDType)
+    overlaps = numpy.zeros(self._numColumns).astype(realDType)
     self._connectedSynapses.rightVecSumAtNZ_fast(inputVector, overlaps)
-    overlaps[overlaps < self._proto.stimulusThreshold] = 0
+    overlaps[overlaps < self._stimulusThreshold] = 0
     return overlaps
 
 
   def _calculateOverlapPct(self, overlaps):
-    return overlaps.astype(realDType) / self._proto.connectedCounts
+    return overlaps.astype(realDType) / self._connectedCounts
 
 
   def _inhibitColumns(self, overlaps):
@@ -1305,20 +1291,20 @@ class SpatialPooler(object):
     # This can be specified by either setting the 'numActiveColumnsPerInhArea'
     # parameter of the 'localAreaDensity' parameter when initializing the class
     overlaps = overlaps.copy()
-    if (self._proto.localAreaDensity > 0):
-      density = self._proto.localAreaDensity
+    if (self._localAreaDensity > 0):
+      density = self._localAreaDensity
     else:
-      inhibitionArea = ((2*self._proto.inhibitionRadius + 1)
-                                    ** len(self._proto.columnDimensions))
-      inhibitionArea = min(self._proto.numColumns, inhibitionArea)
-      density = float(self._proto.numActiveColumnsPerInhArea) / inhibitionArea
+      inhibitionArea = ((2*self._inhibitionRadius + 1)
+                                    ** self._columnDimensions.size)
+      inhibitionArea = min(self._numColumns, inhibitionArea)
+      density = float(self._numActiveColumnsPerInhArea) / inhibitionArea
       density = min(density, 0.5)
 
     # Add our fixed little bit of random noise to the scores to help break ties.
-    overlaps += self._proto.tieBreaker
+    overlaps += self._tieBreaker
 
-    if self._proto.globalInhibition or \
-      self._proto.inhibitionRadius > max(self._proto.columnDimensions):
+    if self._globalInhibition or \
+      self._inhibitionRadius > max(self._columnDimensions):
       return self._inhibitColumnsGlobal(overlaps, density)
     else:
       return self._inhibitColumnsLocal(overlaps, density)
@@ -1341,8 +1327,8 @@ class SpatialPooler(object):
     """
     #calculate num active per inhibition area
 
-    numActive = int(density * self._proto.numColumns)
-    activeColumns = numpy.zeros(self._proto.numColumns)
+    numActive = int(density * self._numColumns)
+    activeColumns = numpy.zeros(self._numColumns)
     winners = sorted(range(overlaps.size),
                      key=lambda k: overlaps[k],
                      reverse=True)[0:numActive]
@@ -1367,14 +1353,14 @@ class SpatialPooler(object):
     density:        The fraction of columns to survive inhibition. This
                     value is only an intended target. Since the surviving
                     columns are picked in a local fashion, the exact fraction
-                    of survining columns is likely to vary.
+                    of surviving columns is likely to vary.
     """
-    activeColumns = numpy.zeros(self._proto.numColumns)
+    activeColumns = numpy.zeros(self._numColumns)
     addToWinners = max(overlaps)/1000.0
     overlaps = numpy.array(overlaps, dtype=realDType)
-    for i in xrange(self._proto.numColumns):
-      maskNeighbors = self._getNeighborsND(i, self._proto.columnDimensions,
-        self._proto.inhibitionRadius)
+    for i in xrange(self._numColumns):
+      maskNeighbors = self._getNeighborsND(i, self._columnDimensions,
+        self._inhibitionRadius)
       overlapSlice = overlaps[maskNeighbors]
       numActive = int(0.5 + density * (len(maskNeighbors) + 1))
       numBigger = numpy.count_nonzero(overlapSlice > overlaps[i])
@@ -1389,7 +1375,7 @@ class SpatialPooler(object):
     """
     Returns a list of indices corresponding to the neighbors of a given column.
     In this variation of the method, which only supports a one dimensional
-    column toplogy, a column's neighbors are those neighbors who are 'radius'
+    column topology, a column's neighbors are those neighbors who are 'radius'
     indices away. This information is needed to perform inhibition. This method
     is a subset of _getNeighborsND and is only included for illustration
     purposes, and potentially enhanced performance for spatial pooler
@@ -1399,7 +1385,7 @@ class SpatialPooler(object):
     ----------------------------
     columnIndex:    The index identifying a column in the permanence, potential
                     and connectivity matrices.
-    dimensions:     An array containg a dimensions for the column space. A 2x3
+    dimensions:     An array containing a dimensions for the column space. A 2x3
                     grid will be represented by [2,3].
     radius:         Indicates how far away from a given column are other
                     columns to be considered its neighbors. In the previous 2x3
@@ -1408,7 +1394,7 @@ class SpatialPooler(object):
     wrapAround:     A boolean value indicating whether to consider columns at
                     the border of a dimensions to be adjacent to columns at the
                     other end of the dimension. For example, if the columns are
-                    layed out in one deimnsion, columns 1 and 10 will be
+                    laid out in one dimension, columns 1 and 10 will be
                     considered adjacent if wrapAround is set to true:
                     [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     """
@@ -1417,7 +1403,7 @@ class SpatialPooler(object):
 
     if wrapAround:
       neighbors = numpy.array(
-        range(columnIndex-radius, columnIndex+radius+1)) % ncols
+        range(columnIndex-radius,columnIndex+radius+1)) % ncols
     else:
       neighbors = numpy.array(
         range(columnIndex-radius,columnIndex+radius+1))
@@ -1434,7 +1420,7 @@ class SpatialPooler(object):
     """
     Returns a list of indices corresponding to the neighbors of a given column.
     Since the permanence values are stored in such a way that information about
-    toplogy is lost, this method allows for reconstructing the toplogy of the
+    topology is lost, this method allows for reconstructing the topology of the
     inputs, which are flattened to one array. Given a column's index, its
     neighbors are defined as those columns that are 'radius' indices away from
     it in each dimension. The method returns a list of the flat indices of
@@ -1447,7 +1433,7 @@ class SpatialPooler(object):
     ----------------------------
     columnIndex:    The index identifying a column in the permanence, potential
                     and connectivity matrices.
-    dimensions:     An array containg a dimensions for the column space. A 2x3
+    dimensions:     An array containing a dimensions for the column space. A 2x3
                     grid will be represented by [2,3].
     radius:         Indicates how far away from a given column are other
                     columns to be considered its neighbors. In the previous 2x3
@@ -1456,7 +1442,7 @@ class SpatialPooler(object):
     wrapAround:     A boolean value indicating whether to consider columns at
                     the border of a dimensions to be adjacent to columns at the
                     other end of the dimension. For example, if the columns are
-                    layed out in one deimnsion, columns 1 and 10 will be
+                    laid out in one dimension, columns 1 and 10 will be
                     considered adjacent if wrapAround is set to true:
                     [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     """
@@ -1494,8 +1480,8 @@ class SpatialPooler(object):
     """
     Similar to _getNeighbors1D and _getNeighbors2D, this function Returns a
     list of indices corresponding to the neighbors of a given column. Since the
-    permanence values are stored in such a way that information about toplogy
-    is lost. This method allows for reconstructing the toplogy of the inputs,
+    permanence values are stored in such a way that information about topology
+    is lost. This method allows for reconstructing the topology of the inputs,
     which are flattened to one array. Given a column's index, its neighbors are
     defined as those columns that are 'radius' indices away from it in each
     dimension. The method returns a list of the flat indices of these columns.
@@ -1503,7 +1489,7 @@ class SpatialPooler(object):
     ----------------------------
     columnIndex:    The index identifying a column in the permanence, potential
                     and connectivity matrices.
-    dimensions:     An array containg a dimensions for the column space. A 2x3
+    dimensions:     An array containing a dimensions for the column space. A 2x3
                     grid will be represented by [2,3].
     radius:         Indicates how far away from a given column are other
                     columns to be considered its neighbors. In the previous 2x3
@@ -1512,15 +1498,22 @@ class SpatialPooler(object):
     wrapAround:     A boolean value indicating whether to consider columns at
                     the border of a dimensions to be adjacent to columns at the
                     other end of the dimension. For example, if the columns are
-                    layed out in one deimnsion, columns 1 and 10 will be
+                    laid out in one dimension, columns 1 and 10 will be
                     considered adjacent if wrapAround is set to true:
                     [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     """
-    assert len(dimensions) > 0
+    assert(dimensions.size > 0)
+    bounds = numpy.cumprod(numpy.append([1], dimensions[::-1][:-1]))[::-1]
 
-    columnCoords = numpy.unravel_index(columnIndex, dimensions)
+    def toCoords(index):
+      return (index / bounds) % dimensions
+
+    def toIndex(coords):
+      return numpy.dot(bounds, coords)
+
+    columnCoords = toCoords(columnIndex)
     rangeND = []
-    for i in xrange(len(dimensions)):
+    for i in xrange(dimensions.size):
       if wrapAround:
         curRange = numpy.array(range(columnCoords[i]-radius,
                                      columnCoords[i]+radius+1)) % dimensions[i]
@@ -1532,18 +1525,19 @@ class SpatialPooler(object):
 
       rangeND.append(curRange)
 
-    neighbors = [numpy.ravel_multi_index(coord, dimensions) for coord in
+    neighbors = [toIndex(numpy.array(coord)) for coord in
       itertools.product(*rangeND)]
-    neighbors.remove(columnIndex)
+    neighbors = list(set(neighbors) - set([columnIndex]))
+    assert(neighbors)
     return neighbors
 
 
   def _isUpdateRound(self):
     """
-    returns true if the enough rounds have passed to warrant updates of
+    returns true if enough rounds have passed to warrant updates of
     duty cycles
     """
-    return (self._proto.iterationNum % self._proto.updatePeriod) == 0
+    return (self._iterationNum % self._updatePeriod) == 0
 
 
   def _seed(self, seed=-1):
@@ -1577,4 +1571,4 @@ class SpatialPooler(object):
     print "dutyCyclePeriod            = ", self.getDutyCyclePeriod()
     print "maxBoost                   = ", self.getMaxBoost()
     print "spVerbosity                = ", self.getSpVerbosity()
-    print "version                    = ", self._proto.version
+    print "version                    = ", self._version
