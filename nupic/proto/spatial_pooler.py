@@ -22,10 +22,13 @@
 import itertools
 import numpy
 
+import capnp
+
 from nupic.bindings.math import (SM32 as SparseMatrix,
                                  SM_01_32_32 as SparseBinaryMatrix,
                                  GetNTAReal,
                                  Random as NupicRandom)
+from nupic.proto import spatial_pooler_capnp
 
 realDType = GetNTAReal()
 uintType = "uint32"
@@ -317,6 +320,132 @@ class SpatialPooler(object):
 
     if self._spVerbosity > 0:
       self.printParameters()
+
+
+  def save(self, filename):
+    """ From the Pycapnp dev (https://github.com/jparyani/pycapnp/issues/29):
+    "For pycapnp, you need to be very careful about using pycapnp structs as
+    intermediary data structures. Their intended use is to be built up from
+    scratch and then serialized/thrown away or kept as read-only from then on."
+
+    For this reason we create the capnp object at save time and do not use it
+    in memory throughout the spatial pooler. Same for loading.
+    """
+
+    # Create the capnp buffer
+    proto = spatial_pooler_capnp.SpatialPooler.new_message()
+
+    # Copy over all our local fields
+    proto.numInputs                  = self._numInputs
+    proto.numColumns                 = self._numColumns
+    proto.potentialRadius            = self._potentialRadius
+    proto.potentialPct               = self._potentialPct
+    proto.numActiveColumnsPerInhArea = self._numActiveColumnsPerInhArea
+    proto.localAreaDensity           = self._localAreaDensity
+    proto.stimulusThreshold          = self._stimulusThreshold
+    proto.synPermInactiveDec         = self._synPermInactiveDec
+    proto.synPermActiveInc           = self._synPermActiveInc
+    proto.synPermBelowStimulusInc    = self._synPermBelowStimulusInc
+    proto.synPermConnected           = self._synPermConnected
+    proto.minPctOverlapDutyCycles    = self._minPctOverlapDutyCycles
+    proto.minPctActiveDutyCycles     = self._minPctActiveDutyCycles
+    proto.dutyCyclePeriod            = self._dutyCyclePeriod
+    proto.maxBoost                   = self._maxBoost
+    proto.spVerbosity                = self._spVerbosity
+
+    proto.synPermMin                 = self._synPermMin
+    proto.synPermMax                 = self._synPermMax
+    proto.synPermTrimThreshold       = self._synPermTrimThreshold
+    proto.updatePeriod               = self._updatePeriod
+
+    proto.version                    = self._version
+    proto.iterationNum               = self._iterationNum
+    proto.iterationLearnNum          = self._iterationLearnNum
+
+
+    # store _potentialPools to capnp
+    nonZeroIndices = []
+    for i in xrange(self._potentialPools.nRows()):
+      nonZeroIndices.extend(self._potentialPools.getSparseRow(i))
+    proto.init('potentialPools', self._potentialPools.nNonZeros())
+    proto.potentialPools = nonZeroIndices
+
+    # store permanences
+    # store connectedSynapses
+
+    # Finally, write the capnp buffer to file
+    with open(filename, "w+b") as f:
+      proto.write(f)
+
+
+  def load(self, filename):
+    with open(filename, "r+b") as f:
+      proto = spatial_pooler_capnp.SpatialPooler.read(f)
+
+    # Copy over capnp data to our local fields
+    self._numInputs                  = proto.numInputs
+    self._numColumns                 = proto.numColumns
+    self._columnDimensions           = proto.columnDimensions
+    self._inputDimensions            = proto.inputDimensions
+    self._potentialRadius            = proto.potentialRadius
+    self._potentialPct               = proto.potentialPct
+    self._globalInhibition           = proto.globalInhibition
+    self._numActiveColumnsPerInhArea = proto.numActiveColumnsPerInhArea
+    self._localAreaDensity           = protolocalAreaDensity
+    self._stimulusThreshold          = proto.stimulusThreshold
+    self._synPermInactiveDec         = proto.synPermInactiveDec
+    self._synPermActiveInc           = proto.synPermActiveInc
+    self._synPermBelowStimulusInc    = proto.synPermBelowStimulusInc
+    self._synPermConnected           = proto.synPermConnected
+    self._minPctOverlapDutyCycles    = proto.minPctOverlapDutyCycle
+    self._minPctActiveDutyCycles     = proto.minPctActiveDutyCycle
+    self._dutyCyclePeriod            = proto.dutyCyclePeriod
+    self._maxBoost                   = proto.maxBoost
+    self._spVerbosity                = proto.spVerbosity
+
+    self._synPermMin                 = proto.synPermMin
+    self._synPermMax                 = proto.synPermMax
+    self._synPermTrimThreshold       = proto.synPermTrimThreshold
+    self._updatePeriod               = proto.updatePeriod
+    assert(self._synPermTrimThreshold < self._synPermConnected)
+
+    self._version                    = proto.version
+    self._iterationNum               = proto.iterationNum
+    self._iterationLearnNum          = proto.iterationLearnNum
+
+
+    # recreate _potentialPools SparseMatrix from capnp format
+    numInputs = int(self._proto.numInputs)
+    numColumns = int(self._proto.numColumns)
+    self._potentialPools = SparseBinaryMatrix(numInputs)
+    self._potentialPools.resize(numColumns, numInputs)
+
+    # Recreate SparseBinaryMatrix for potentialPools
+    currentRow = 0
+    row = []
+    allAdded = []
+    previousIndex = -1
+    for index in self._proto.potentialPools:
+      if index > previousIndex:
+        # Add to the current row as long as we get larger numbers
+        row.append(index)
+        allAdded.append(index)
+      else:
+        # If we get an index with a lower value, we're on a new row
+        # First append the row we've got
+        self._potentialPools.replaceSparseRow(currentRow, row)
+
+        # Then intialize a new row and increment the currentRow
+        row = [index]
+        allAdded.append(index)
+        currentRow += 1
+      previousIndex = index
+
+    #add the last row
+    self._potentialPools.replaceSparseRow(currentRow, row)
+
+    # get permanence from capnp object
+    # _updatePermanencesForColumn
 
 
   def getColumnDimensions(self):
