@@ -51,23 +51,23 @@ class SpatialPooler(object):
   """
 
   def __init__(self,
-               inputDimensions=(32,32),
-               columnDimensions=(64,64),
-               potentialRadius=16,
-               potentialPct=0.5,
-               globalInhibition=False,
-               localAreaDensity=-1.0,
-               numActiveColumnsPerInhArea=10.0,
-               stimulusThreshold=0,
-               synPermInactiveDec=0.01,
-               synPermActiveInc=0.1,
-               synPermConnected=0.10,
-               minPctOverlapDutyCycle=0.001,
-               minPctActiveDutyCycle=0.001,
-               dutyCyclePeriod=1000,
-               maxBoost=10.0,
-               seed=-1,
-               spVerbosity=0
+               inputDimensions            = (32,32),
+               columnDimensions           = (64,64),
+               potentialRadius            = 16,
+               potentialPct               = 0.5,
+               globalInhibition           = False,
+               localAreaDensity           = -1.0,
+               numActiveColumnsPerInhArea = 10.0,
+               stimulusThreshold          = 0,
+               synPermInactiveDec         = 0.01,
+               synPermActiveInc           = 0.1,
+               synPermConnected           = 0.10,
+               minPctOverlapDutyCycle     = 0.001,
+               minPctActiveDutyCycle      = 0.001,
+               dutyCyclePeriod            = 1000,
+               maxBoost                   = 10.0,
+               seed                       = -1,
+               spVerbosity                = 0
                ):
     """
     Parameters:
@@ -209,38 +209,38 @@ class SpatialPooler(object):
     self._seed(seed)
 
     # save arguments
-    self._numInputs = int(numInputs)
-    self._numColumns = int(numColumns)
-    self._columnDimensions = columnDimensions
-    self._inputDimensions = inputDimensions
-    self._potentialRadius = int(min(potentialRadius, numInputs))
-    self._potentialPct = potentialPct
-    self._globalInhibition = globalInhibition
+    self._numInputs                  = int(numInputs)
+    self._numColumns                 = int(numColumns)
+    self._columnDimensions           = columnDimensions
+    self._inputDimensions            = inputDimensions
+    self._potentialRadius            = int(min(potentialRadius, numInputs))
+    self._potentialPct               = potentialPct
+    self._globalInhibition           = globalInhibition
     self._numActiveColumnsPerInhArea = int(numActiveColumnsPerInhArea)
-    self._localAreaDensity = localAreaDensity
-    self._stimulusThreshold = stimulusThreshold
-    self._synPermInactiveDec = synPermInactiveDec
-    self._synPermActiveInc = synPermActiveInc
-    self._synPermBelowStimulusInc = synPermConnected / 10.0
-    self._synPermConnected = synPermConnected
-    self._minPctOverlapDutyCycles = minPctOverlapDutyCycle
-    self._minPctActiveDutyCycles = minPctActiveDutyCycle
-    self._dutyCyclePeriod = dutyCyclePeriod
-    self._maxBoost = maxBoost
-    self._spVerbosity = spVerbosity
+    self._localAreaDensity           = localAreaDensity
+    self._stimulusThreshold          = stimulusThreshold
+    self._synPermInactiveDec         = synPermInactiveDec
+    self._synPermActiveInc           = synPermActiveInc
+    self._synPermBelowStimulusInc    = synPermConnected / 10.0
+    self._synPermConnected           = synPermConnected
+    self._minPctOverlapDutyCycles    = minPctOverlapDutyCycle
+    self._minPctActiveDutyCycles     = minPctActiveDutyCycle
+    self._dutyCyclePeriod            = dutyCyclePeriod
+    self._maxBoost                   = maxBoost
+    self._spVerbosity                = spVerbosity
 
     # Extra parameter settings
-    self._synPermMin = 0.0
-    self._synPermMax = 1.0
-    self._synPermTrimThreshold = synPermActiveInc / 2.0
+    self._synPermMin                 = 0.0
+    self._synPermMax                 = 1.0
+    self._synPermTrimThreshold       = synPermActiveInc / 2.0
     assert(self._synPermTrimThreshold < self._synPermConnected)
-    self._updatePeriod = 50
-    initConnectedPct = 0.5
+    self._updatePeriod               = 50
+    initConnectedPct                 = 0.5
 
     # Internal state
-    self._version = 1.0
-    self._iterationNum = 0
-    self._iterationLearnNum = 0
+    self._version                    = 1.0
+    self._iterationNum               = 0
+    self._iterationLearnNum          = 0
 
     # initialize the random number generators
     self._seed(seed)
@@ -273,9 +273,8 @@ class SpatialPooler(object):
 
     # Initialize a tiny random tie breaker. This is used to determine winning
     # columns where the overlaps are identical.
-    self._tieBreaker = 0.01*numpy.array([self._random.getReal64() for i in
+    self._tieBreaker = 0.01 * numpy.array([self._random.getReal64() for i in
                                         xrange(self._numColumns)])
-
 
     # 'self._connectedSynapses' is a similar matrix to 'self._permanences'
     # (rows represent cortical columns, columns represent input bits) whose
@@ -301,14 +300,11 @@ class SpatialPooler(object):
       perm = self._initPermanence(potential, initConnectedPct)
       self._updatePermanencesForColumn(perm, i, raisePerm=True)
 
-
-    self._overlapDutyCycles = numpy.zeros(numColumns, dtype=realDType)
-    self._activeDutyCycles = numpy.zeros(numColumns, dtype=realDType)
-    self._minOverlapDutyCycles = numpy.zeros(numColumns,
-                                             dtype=realDType)
-    self._minActiveDutyCycles = numpy.zeros(numColumns,
-                                            dtype=realDType)
-    self._boostFactors = numpy.ones(numColumns, dtype=realDType)
+    self._overlapDutyCycles    = numpy.zeros(numColumns, dtype=realDType)
+    self._activeDutyCycles     = numpy.zeros(numColumns, dtype=realDType)
+    self._minOverlapDutyCycles = numpy.zeros(numColumns, dtype=realDType)
+    self._minActiveDutyCycles  = numpy.zeros(numColumns, dtype=realDType)
+    self._boostFactors         = numpy.ones (numColumns, dtype=realDType)
 
     # The inhibition radius determines the size of a column's local
     # neighborhood. of a column. A cortical column must overcome the overlap
@@ -324,7 +320,7 @@ class SpatialPooler(object):
 
   def save(self, filename):
     """ From the Pycapnp dev (https://github.com/jparyani/pycapnp/issues/29):
-    "For pycapnp, you need to be very careful about using pycapnp structs as
+      "For pycapnp, you need to be very careful about using pycapnp structs as
     intermediary data structures. Their intended use is to be built up from
     scratch and then serialized/thrown away or kept as read-only from then on."
 
@@ -338,8 +334,15 @@ class SpatialPooler(object):
     # Copy over all our local fields
     proto.numInputs                  = self._numInputs
     proto.numColumns                 = self._numColumns
+    colDims = proto.init("columnDimensions", len(self._columnDimensions))
+    for i, dim in enumerate(self._columnDimensions):
+      colDims[i] = int(dim)
+    inpDims = proto.init("inputDimensions", len(self._inputDimensions))
+    for i, dim in enumerate(self._inputDimensions):
+      inpDims[i] = int(dim)
     proto.potentialRadius            = self._potentialRadius
     proto.potentialPct               = self._potentialPct
+    proto.globalInhibition           = self._globalInhibition
     proto.numActiveColumnsPerInhArea = self._numActiveColumnsPerInhArea
     proto.localAreaDensity           = self._localAreaDensity
     proto.stimulusThreshold          = self._stimulusThreshold
@@ -361,17 +364,47 @@ class SpatialPooler(object):
     proto.version                    = self._version
     proto.iterationNum               = self._iterationNum
     proto.iterationLearnNum          = self._iterationLearnNum
+    proto.inhibitionRadius           = self._inhibitionRadius
 
-
-    # store _potentialPools to capnp
+    # Store potentialPools
     nonZeroIndices = []
     for i in xrange(self._potentialPools.nRows()):
       nonZeroIndices.extend(self._potentialPools.getSparseRow(i))
-    proto.init('potentialPools', self._potentialPools.nNonZeros())
+    proto.init("potentialPools", self._potentialPools.nNonZeros())
     proto.potentialPools = nonZeroIndices
 
-    # store permanences
-    # store connectedSynapses
+    # Store permanences
+    # TODO Call self._permanences.getRow() once and see if it helps performance
+    permanenceRows = proto.init("permanences", self._numColumns)
+    for i in xrange(self._permanences.nRows()):
+      row = permanenceRows[i].init("values", self._numInputs)
+      for j in xrange(len(self._permanences.getRow(i))):
+        row[j] = float(self._permanences.getRow(i)[j])
+
+    # Store connectedSynapses
+    nonZeroIndices = []
+    for i in xrange(self._connectedSynapses.nRows()):
+      nonZeroIndices.extend(self._connectedSynapses.getSparseRow(i))
+    proto.init("connectedSynapses", self._connectedSynapses.nNonZeros())
+    proto.connectedSynapses = nonZeroIndices
+
+    # Store other things
+    print "numColumns: ", self._numColumns
+    connectedCounts      = proto.init("connectedCounts",      self._numColumns)
+    overlapDutyCycles    = proto.init("overlapDutyCycles",    self._numColumns)
+    activeDutyCycles     = proto.init("activeDutyCycles",     self._numColumns)
+    minOverlapDutyCycles = proto.init("minOverlapDutyCycles", self._numColumns)
+    minActiveDutyCycles  = proto.init("minActiveDutyCycles",  self._numColumns)
+    boostFactors         = proto.init("boostFactors",         self._numColumns)
+    tieBreaker           = proto.init("tieBreaker",           self._numColumns)
+    for i in xrange(self._numColumns):
+      connectedCounts[i]      = int(self._connectedCounts[i])
+      overlapDutyCycles[i]    = float(self._overlapDutyCycles[i])
+      activeDutyCycles[i]     = float(self._activeDutyCycles[i])
+      minOverlapDutyCycles[i] = float(self._minOverlapDutyCycles[i])
+      minActiveDutyCycles[i]  = float(self._minActiveDutyCycles[i])
+      boostFactors[i]         = float(self._boostFactors[i])
+      tieBreaker[i]           = float(self._tieBreaker[i])
 
     # Finally, write the capnp buffer to file
     with open(filename, "w+b") as f:
@@ -385,20 +418,20 @@ class SpatialPooler(object):
     # Copy over capnp data to our local fields
     self._numInputs                  = proto.numInputs
     self._numColumns                 = proto.numColumns
-    self._columnDimensions           = proto.columnDimensions
-    self._inputDimensions            = proto.inputDimensions
+    self._columnDimensions           = numpy.array(proto.columnDimensions)
+    self._inputDimensions            = numpy.array(proto.inputDimensions)
     self._potentialRadius            = proto.potentialRadius
     self._potentialPct               = proto.potentialPct
     self._globalInhibition           = proto.globalInhibition
     self._numActiveColumnsPerInhArea = proto.numActiveColumnsPerInhArea
-    self._localAreaDensity           = protolocalAreaDensity
+    self._localAreaDensity           = proto.localAreaDensity
     self._stimulusThreshold          = proto.stimulusThreshold
     self._synPermInactiveDec         = proto.synPermInactiveDec
     self._synPermActiveInc           = proto.synPermActiveInc
     self._synPermBelowStimulusInc    = proto.synPermBelowStimulusInc
     self._synPermConnected           = proto.synPermConnected
-    self._minPctOverlapDutyCycles    = proto.minPctOverlapDutyCycle
-    self._minPctActiveDutyCycles     = proto.minPctActiveDutyCycle
+    self._minPctOverlapDutyCycles    = proto.minPctOverlapDutyCycles
+    self._minPctActiveDutyCycles     = proto.minPctActiveDutyCycles
     self._dutyCyclePeriod            = proto.dutyCyclePeriod
     self._maxBoost                   = proto.maxBoost
     self._spVerbosity                = proto.spVerbosity
@@ -412,40 +445,76 @@ class SpatialPooler(object):
     self._version                    = proto.version
     self._iterationNum               = proto.iterationNum
     self._iterationLearnNum          = proto.iterationLearnNum
+    self._inhibitionRadius           = proto.inhibitionRadius
 
-
-    # recreate _potentialPools SparseMatrix from capnp format
-    numInputs = int(self._proto.numInputs)
-    numColumns = int(self._proto.numColumns)
+    # Load potentialPools SparseMatrix from capnp format
+    numInputs  = int(proto.numInputs)
+    numColumns = int(proto.numColumns)
     self._potentialPools = SparseBinaryMatrix(numInputs)
     self._potentialPools.resize(numColumns, numInputs)
-
-    # Recreate SparseBinaryMatrix for potentialPools
     currentRow = 0
     row = []
     allAdded = []
     previousIndex = -1
-    for index in self._proto.potentialPools:
+    for index in proto.potentialPools:
       if index > previousIndex:
         # Add to the current row as long as we get larger numbers
         row.append(index)
-        allAdded.append(index)
       else:
         # If we get an index with a lower value, we're on a new row
         # First append the row we've got
         self._potentialPools.replaceSparseRow(currentRow, row)
-
         # Then intialize a new row and increment the currentRow
         row = [index]
-        allAdded.append(index)
         currentRow += 1
       previousIndex = index
-
-    #add the last row
+    # Add the final row
     self._potentialPools.replaceSparseRow(currentRow, row)
 
-    # get permanence from capnp object
-    # _updatePermanencesForColumn
+    # Create permanences from capnp object
+    self._permanences = SparseMatrix(numColumns, numInputs)
+    for i in xrange(numColumns):
+      for j in xrange(numInputs):
+        self._permanences.set(i, j, proto.permanences[i].values[j])
+
+    # Load connectedSynapses (same way we load potentialPools)
+    self._connectedSynapses = SparseBinaryMatrix(numInputs)
+    self._connectedSynapses.resize(numColumns, numInputs)
+    currentRow = 0
+    row = []
+    allAdded = []
+    previousIndex = -1
+    for index in proto.connectedSynapses:
+      if index > previousIndex:
+        # Add to the current row as long as we get larger numbers
+        row.append(index)
+      else:
+        # If we get an index with a lower value, we're on a new row
+        # First append the row we've got
+        self._connectedSynapses.replaceSparseRow(currentRow, row)
+        # Then intialize a new row and increment the currentRow
+        row = [index]
+        currentRow += 1
+      previousIndex = index
+    # Add the final row
+    self._connectedSynapses.replaceSparseRow(currentRow, row)
+
+    # Load other things
+    self._connectedCounts.resize     (self._numColumns)
+    self._overlapDutyCycles.resize   (self._numColumns)
+    self._activeDutyCycles.resize    (self._numColumns)
+    self._minOverlapDutyCycles.resize(self._numColumns)
+    self._minActiveDutyCycles.resize (self._numColumns)
+    self._boostFactors.resize        (self._numColumns)
+    self._tieBreaker.resize          (self._numColumns)
+    for i in xrange(self._numColumns):
+      self._connectedCounts[i]      = proto.connectedCounts[i]
+      self._overlapDutyCycles[i]    = proto.overlapDutyCycles[i]
+      self._activeDutyCycles[i]     = proto.activeDutyCycles[i]
+      self._minOverlapDutyCycles[i] = proto.minOverlapDutyCycles[i]
+      self._minActiveDutyCycles[i]  = proto.minActiveDutyCycles[i]
+      self._boostFactors[i]         = proto.boostFactors[i]
+      self._tieBreaker[i]           = proto.tieBreaker[i]
 
 
   def getColumnDimensions(self):
@@ -886,7 +955,7 @@ class SpatialPooler(object):
         self._minPctOverlapDutyCycles * self._overlapDutyCycles.max()
       )
     self._minActiveDutyCycles.fill(
-        self._minPctActiveDutyCycles * self._activeDutyCycles.max()
+        self._minPctActiveDutyCycles  * self._activeDutyCycles.max()
       )
 
 
@@ -1328,7 +1397,7 @@ class SpatialPooler(object):
 
 
   def _updateBoostFactors(self):
-    r"""
+    """
     Update the boost factors for all columns. The boost factors are used to
     increase the overlap of inactive columns to improve their chances of
     becoming active. and hence encourage participation of more columns in the
