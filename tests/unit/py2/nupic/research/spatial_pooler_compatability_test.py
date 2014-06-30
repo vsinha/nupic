@@ -253,10 +253,10 @@ class SpatialPoolerCompatabilityTest(unittest.TestCase):
       learn = (randomState.rand() > 0.5)
       sp1.compute(inputVector, learn, activeArray)
 
-    import pdb; pdb.set_trace()
-    sp1.savePath()
+    sp1.save("test_save.bin")
+    sp2 = CreateSP(imp)
+    sp2.load("test_save.bin")
 
-    sp2 = pickle.loads(pickle.dumps(sp1))
     for i in xrange(numRecords/2+1,numRecords):
       activeArray1 = numpy.zeros(numColumns).astype(uintType)
       activeArray2 = numpy.zeros(numColumns).astype(uintType)
@@ -387,20 +387,12 @@ class SpatialPoolerCompatabilityTest(unittest.TestCase):
       'spVerbosity' : 0
     }
 
-    print "creating first spatial pooler"
     sp1 = CreateSP("capnp", params)
-    #import pdb; pdb.set_trace()
-
-    print "saving"
     sp1.save("test_save.bin")
 
-    print "creating second spatial pooler"
     sp2 = CreateSP("capnp")
-
-    print "loading"
     sp2.load("test_save.bin")
 
-    print "comparing"
     self.compare(sp1, sp2)
 
 
