@@ -389,7 +389,6 @@ class SpatialPooler(object):
     proto.connectedSynapses = nonZeroIndices
 
     # Store other things
-    print "numColumns: ", self._numColumns
     connectedCounts      = proto.init("connectedCounts",      self._numColumns)
     overlapDutyCycles    = proto.init("overlapDutyCycles",    self._numColumns)
     activeDutyCycles     = proto.init("activeDutyCycles",     self._numColumns)
