@@ -395,6 +395,35 @@ class SpatialPoolerCompatabilityTest(unittest.TestCase):
 
     self.compare(sp1, sp2)
 
+  def testProtoProfileSerialization(self):
+    params = {
+      'inputDimensions' : [2,4,5],
+      'columnDimensions' : [4,3,3],
+    }
+
+    sp1 = CreateSP("capnp", params)
+    sp1.save("test_save.bin")
+    sp2 = CreateSP("capnp")
+    sp2.load("test_save.bin")
+
+  def testPickleProfileSerialization(self):
+    params = {
+      'inputDimensions' : [2,4,5],
+      'columnDimensions' : [4,3,3],
+    }
+
+    sp1 = CreateSP("py", params)
+    sp2 = pickle.loads(pickle.dumps(sp1))
+
+  def testProfileSerialization(self):
+    numTests = 1
+
+    import timeit
+    capnpTime = timeit.timeit(self.testProtoProfileSerialization, number = numTests)
+    pyTime = timeit.timeit(self.testPickleProfileSerialization, number = numTests)
+    print pyTime
+    print capnpTime
+    raise Exception
 
   def testSerializationRun(self):
     params = {
