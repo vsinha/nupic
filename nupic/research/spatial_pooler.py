@@ -691,7 +691,7 @@ class SpatialPooler(object):
                     everywhere else.
     """
     assert (numpy.size(inputVector) == self._numInputs)
-    self._updateBookeepingVars(learn)
+    self._updateBookkeepingVars(learn)
     inputVector = numpy.array(inputVector, dtype=realDType)
     inputVector.reshape(-1)
     overlaps = self._calculateOverlap(inputVector)
@@ -1260,7 +1260,7 @@ class SpatialPooler(object):
       self._minActiveDutyCycles] = 1.0
 
 
-  def _updateBookeepingVars(self, learn):
+  def _updateBookkeepingVars(self, learn):
     """
     Updates counter instance variables each round.
 

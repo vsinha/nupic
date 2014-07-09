@@ -184,13 +184,13 @@ class FlatSpatialPooler(SpatialPooler):
       learn=False
 
     assert (numpy.size(inputArray) == self._numInputs)
-    self._updateBookeepingVars(learn)
+    self._updateBookkeepingVars(learn)
     inputVector = numpy.array(inputArray, dtype=realDType)
     overlaps = self._calculateOverlap(inputVector)
     overlapsPct = self._calculateOverlapPct(overlaps)
     highTierColumns = self._selectHighTierColumns(overlapsPct)
     virginColumns = self._selectVirginColumns()
-    
+
     if learn:
       vipOverlaps = self._boostFactors * overlaps
     else:
