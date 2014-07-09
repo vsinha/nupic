@@ -1226,7 +1226,7 @@ class SpatialPooler(object):
 
 
   def _updateBoostFactors(self):
-    r"""
+    """
     Update the boost factors for all columns. The boost factors are used to
     increase the overlap of inactive columns to improve their chances of
     becoming active. and hence encourage participation of more columns in the
